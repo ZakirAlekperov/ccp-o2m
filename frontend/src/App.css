@@ -1,0 +1,64 @@
+/* App-specific styles */
+.app-layout {
+  min-height: 100vh;
+}
+
+.app-content {
+  margin: 24px;
+  padding: 24px;
+  background: #fff;
+  border-radius: 8px;
+  min-height: calc(100vh - 112px);
+}
+
+.page-header {
+  margin-bottom: 24px;
+}
+
+/* Map container */
+.map-container {
+  height: 500px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+/* Table actions */
+.table-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* Status badges */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.status-new {
+  background: #e6f7ff;
+  color: #1890ff;
+}
+
+.status-approved {
+  background: #f6ffed;
+  color: #52c41a;
+}
+
+.status-in-progress {
+  background: #fff7e6;
+  color: #fa8c16;
+}
+
+.status-completed {
+  background: #f6ffed;
+  color: #52c41a;
+}
+
+.status-cancelled {
+  background: #fff1f0;
+  color: #f5222d;
+}
