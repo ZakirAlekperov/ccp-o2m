@@ -4,6 +4,7 @@ import { UserOutlined, LockOutlined } from '@ant-design/icons'
 import { useDispatch } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
 import { loginStart, loginSuccess, loginFailure } from '../store/authSlice'
+import { getHomePathForRole } from '../router/roleRegistry'
 
 const { Title } = Typography
 const API_URL = '/api'
@@ -29,15 +30,15 @@ const Login = () => {
         throw new Error(data.detail || data.error || 'Неверный логин или пароль')
       }
       const data = await res.json()
-      dispatch(loginSuccess({ user: data.user, token: data.token || data.access }))
 
-      // Перенаправляем по роли
-      const role: string = data.user?.role ?? ''
-      if (role === 'admin') {
-        navigate('/admin')
-      } else {
-        navigate('/')
-      }
+      // Бэкенд возвращает поле access_token
+      const token = data.access_token ?? data.token ?? data.access
+      if (!token) throw new Error('Сервер не вернул токен авторизации')
+
+      dispatch(loginSuccess({ user: data.user, token }))
+
+      // Редирект определяется реестром ролей — не хардкодим пути здесь
+      navigate(getHomePathForRole(data.user?.role ?? ''))
     } catch (e: any) {
       dispatch(loginFailure(e.message))
       setError(e.message)
