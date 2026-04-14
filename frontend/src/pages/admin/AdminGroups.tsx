@@ -1,149 +1,132 @@
-import { useEffect, useState } from 'react'
-import {
-  Table, Button, Space, Modal, Form, Input,
-  Typography, Spin, Alert, Popconfirm, message, Tag,
-} from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
-import { useSelector } from 'react-redux'
-import type { RootState } from '../../store'
+import { Typography, Card, Tag, Row, Col, Table, Badge } from 'antd'
+import { TeamOutlined, LockOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 
-const { Title, Text } = Typography
-const API_URL = '/api'
+const { Title, Text, Paragraph } = Typography
 
-interface Group {
-  id: number
-  name: string
-  permissions?: string[]
-}
+const ROLES = [
+  {
+    key: 'admin',
+    label: 'Администратор',
+    color: 'red',
+    description: 'Полный доступ к системе. Управление пользователями, всеми объектами и данными.',
+    permissions: [
+      { name: 'Управление пользователями', granted: true },
+      { name: 'Управление КА и станциями', granted: true },
+      { name: 'Создание заявок на съёмку', granted: true },
+      { name: 'Планирование',              granted: true },
+      { name: 'Экспорт данных',            granted: true },
+      { name: 'Просмотр данных',           granted: true },
+    ],
+  },
+  {
+    key: 'operator',
+    label: 'Оператор',
+    color: 'blue',
+    description: 'Работа с КА, наземными станциями, заявками на съёмку и планированием.',
+    permissions: [
+      { name: 'Управление пользователями', granted: false },
+      { name: 'Управление КА и станциями', granted: true },
+      { name: 'Создание заявок на съёмку', granted: true },
+      { name: 'Планирование',              granted: true },
+      { name: 'Экспорт данных',            granted: false },
+      { name: 'Просмотр данных',           granted: true },
+    ],
+  },
+  {
+    key: 'analyst',
+    label: 'Аналитик',
+    color: 'purple',
+    description: 'Просмотр данных, создание заявок на съёмку и экспорт данных для анализа.',
+    permissions: [
+      { name: 'Управление пользователями', granted: false },
+      { name: 'Управление КА и станциями', granted: false },
+      { name: 'Создание заявок на съёмку', granted: true },
+      { name: 'Планирование',              granted: false },
+      { name: 'Экспорт данных',            granted: true },
+      { name: 'Просмотр данных',           granted: true },
+    ],
+  },
+  {
+    key: 'viewer',
+    label: 'Наблюдатель',
+    color: 'default',
+    description: 'Только просмотр данных. Изменение объектов недоступно.',
+    permissions: [
+      { name: 'Управление пользователями', granted: false },
+      { name: 'Управление КА и станциями', granted: false },
+      { name: 'Создание заявок на съёмку', granted: false },
+      { name: 'Планирование',              granted: false },
+      { name: 'Экспорт данных',            granted: false },
+      { name: 'Просмотр данных',           granted: true },
+    ],
+  },
+]
 
-const SYSTEM_GROUPS = ['operator', 'admin']
+const permColumns: ColumnsType<{ name: string; granted: boolean }> = [
+  {
+    title: 'Разрешение',
+    dataIndex: 'name',
+    render: (v) => <Text>{v}</Text>,
+  },
+  {
+    title: 'Доступ',
+    dataIndex: 'granted',
+    width: 100,
+    render: (v) => v
+      ? <Badge status="success" text={<Text type="success">Да</Text>} />
+      : <Badge status="default" text={<Text type="secondary">Нет</Text>} />,
+  },
+]
 
-const AdminGroups = () => {
-  const { token } = useSelector((state: RootState) => state.auth)
-  const [groups, setGroups] = useState<Group[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [modalOpen, setModalOpen] = useState(false)
-  const [editingGroup, setEditingGroup] = useState<Group | null>(null)
-  const [form] = Form.useForm()
-
-  const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
-
-  const fetchGroups = async () => {
-    try {
-      setLoading(true)
-      const res = await fetch(`${API_URL}/auth/groups/`, { headers })
-      if (!res.ok) throw new Error('Ошибка загрузки групп')
-      const data = await res.json()
-      setGroups(Array.isArray(data) ? data : data.results ?? [])
-    } catch (e: any) {
-      setError(e.message)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => { fetchGroups() }, [])
-
-  const openCreate = () => {
-    setEditingGroup(null)
-    form.resetFields()
-    setModalOpen(true)
-  }
-
-  const openEdit = (group: Group) => {
-    setEditingGroup(group)
-    form.setFieldsValue(group)
-    setModalOpen(true)
-  }
-
-  const handleSave = async () => {
-    try {
-      const values = await form.validateFields()
-      const url = editingGroup
-        ? `${API_URL}/auth/groups/${editingGroup.id}/`
-        : `${API_URL}/auth/groups/`
-      const method = editingGroup ? 'PATCH' : 'POST'
-      const res = await fetch(url, { method, headers, body: JSON.stringify(values) })
-      if (!res.ok) throw new Error('Ошибка сохранения')
-      message.success(editingGroup ? 'Группа обновлена' : 'Группа создана')
-      setModalOpen(false)
-      fetchGroups()
-    } catch (e: any) {
-      message.error(e.message)
-    }
-  }
-
-  const handleDelete = async (id: number) => {
-    try {
-      const res = await fetch(`${API_URL}/auth/groups/${id}/`, { method: 'DELETE', headers })
-      if (!res.ok) throw new Error('Ошибка удаления')
-      message.success('Группа удалена')
-      fetchGroups()
-    } catch (e: any) {
-      message.error(e.message)
-    }
-  }
-
-  const columns: ColumnsType<Group> = [
-    { title: 'ID', dataIndex: 'id', width: 60 },
-    {
-      title: 'Название',
-      dataIndex: 'name',
-      render: (name) => (
-        <Space>
-          <span>{name}</span>
-          {SYSTEM_GROUPS.includes(name) && <Tag color="orange">Системная</Tag>}
-        </Space>
-      ),
-    },
-    {
-      title: 'Действия',
-      render: (_, record) => (
-        <Space>
-          <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(record)}>Изменить</Button>
-          {!SYSTEM_GROUPS.includes(record.name) && (
-            <Popconfirm title="Удалить группу?" onConfirm={() => handleDelete(record.id)}>
-              <Button size="small" danger icon={<DeleteOutlined />}>Удалить</Button>
-            </Popconfirm>
-          )}
-        </Space>
-      ),
-    },
-  ]
-
-  if (loading) return <Spin size="large" style={{ display: 'block', marginTop: 80, textAlign: 'center' }} />
-  if (error) return <Alert type="error" message={error} style={{ margin: 24 }} />
-
-  return (
-    <div style={{ padding: 24 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <Title level={3} style={{ margin: 0 }}>Группы пользователей</Title>
-        <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>Добавить группу</Button>
-      </div>
-      <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
-        Системные группы (operator, admin) нельзя удалить.
-      </Text>
-
-      <Table rowKey="id" columns={columns} dataSource={groups} />
-
-      <Modal
-        title={editingGroup ? 'Редактировать группу' : 'Новая группа'}
-        open={modalOpen}
-        onOk={handleSave}
-        onCancel={() => setModalOpen(false)}
-        okText="Сохранить"
-        cancelText="Отмена"
-      >
-        <Form form={form} layout="vertical">
-          <Form.Item name="name" label="Название группы" rules={[{ required: true, message: 'Введите название' }]}>
-            <Input placeholder="например: analyst" />
-          </Form.Item>
-        </Form>
-      </Modal>
+const AdminGroups = () => (
+  <div style={{ padding: 24 }}>
+    <div style={{ marginBottom: 24 }}>
+      <Title level={4} style={{ marginBottom: 4 }}>Группы и роли</Title>
+      <Paragraph type="secondary" style={{ marginBottom: 0 }}>
+        Роли определяются на уровне системы. Каждому пользователю назначается одна роль в разделе{' '}
+        <a href="/admin/users">«Пользователи»</a>.
+      </Paragraph>
     </div>
-  )
-}
+
+    <Row gutter={[16, 16]}>
+      {ROLES.map(role => (
+        <Col key={role.key} xs={24} md={12}>
+          <Card
+            title={
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <TeamOutlined />
+                <Tag color={role.color} style={{ marginBottom: 0 }}>{role.label}</Tag>
+              </div>
+            }
+          >
+            <Paragraph type="secondary" style={{ marginBottom: 16 }}>
+              {role.description}
+            </Paragraph>
+            <Table
+              rowKey="name"
+              dataSource={role.permissions}
+              columns={permColumns}
+              pagination={false}
+              size="small"
+              showHeader={false}
+            />
+          </Card>
+        </Col>
+      ))}
+    </Row>
+
+    <Card style={{ marginTop: 16 }}>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+        <LockOutlined style={{ marginTop: 3, color: '#8c8c8c' }} />
+        <Paragraph type="secondary" style={{ marginBottom: 0 }}>
+          Роли и их права зафиксированы в модели <Text code>UserRole</Text> на бэкенде.
+          Чтобы добавить новую роль — добавь значение в <Text code>users/models.py</Text>,
+          затем раскомментируй заготовку в <Text code>frontend/src/router/roleRegistry.tsx</Text>.
+        </Paragraph>
+      </div>
+    </Card>
+  </div>
+)
 
 export default AdminGroups
