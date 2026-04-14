@@ -23,6 +23,7 @@ env = environ.Env(
     KEYCLOAK_CLIENT_SECRET=(str, ''),
     ALLOWED_HOSTS=(list, ['localhost', '127.0.0.1', '*']),
     CORS_ALLOWED_ORIGINS=(list, ['http://localhost:5173', 'http://localhost:3000']),
+    CSRF_TRUSTED_ORIGINS=(list, ['http://localhost:5173', 'http://localhost:3000']),
 )
 
 # Read .env file if exists
@@ -182,6 +183,10 @@ REST_FRAMEWORK = {
 # CORS
 CORS_ALLOWED_ORIGINS = env('CORS_ALLOWED_ORIGINS')
 CORS_ALLOW_CREDENTIALS = True
+
+# CSRF
+# CORS_ALLOWED_ORIGINS и CSRF_TRUSTED_ORIGINS — разные настройки, оба нужны для локальной разработки
+CSRF_TRUSTED_ORIGINS = env('CSRF_TRUSTED_ORIGINS')
 
 # Celery Configuration
 CELERY_BROKER_URL = env('REDIS_URL')
