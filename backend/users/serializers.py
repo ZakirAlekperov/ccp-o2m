@@ -2,33 +2,28 @@
 Users serializers for CCP O2M.
 """
 from rest_framework import serializers
+from django.contrib.auth.password_validation import validate_password
 from .models import User, UserRole
 
 
 class UserSerializer(serializers.ModelSerializer):
-    """User serializer for read operations."""
     role_display = serializers.CharField(source='get_role_display', read_only=True)
-    
+
     class Meta:
         model = User
         fields = [
             'id', 'username', 'email', 'first_name', 'last_name',
-            'role', 'role_display', 'is_active', 'created_at', 'updated_at'
+            'role', 'role_display', 'is_active', 'avatar'
         ]
-        read_only_fields = ['created_at', 'updated_at']
 
 
 class UserCreateSerializer(serializers.ModelSerializer):
-    """User serializer for create operations."""
     password = serializers.CharField(write_only=True, required=True)
-    
+
     class Meta:
         model = User
-        fields = [
-            'id', 'username', 'email', 'password',
-            'first_name', 'last_name', 'role', 'is_active'
-        ]
-    
+        fields = ['id', 'username', 'email', 'password', 'first_name', 'last_name', 'role', 'is_active']
+
     def create(self, validated_data):
         password = validated_data.pop('password')
         user = User.objects.create(**validated_data)
@@ -38,42 +33,23 @@ class UserCreateSerializer(serializers.ModelSerializer):
 
 
 class UserUpdateSerializer(serializers.ModelSerializer):
-    """User serializer for update operations."""
-    
     class Meta:
         model = User
-        fields = [
-            'id', 'username', 'email',
-            'first_name', 'last_name', 'role', 'is_active'
-        ]
-
-
-class LoginSerializer(serializers.Serializer):
-    """Login request serializer."""
-    username = serializers.CharField(required=True)
-    password = serializers.CharField(required=True, write_only=True)
-
-
-class TokenSerializer(serializers.Serializer):
-    """Token response serializer."""
-    access_token = serializers.CharField()
-    refresh_token = serializers.CharField()
-    expires_in = serializers.IntegerField()
-    token_type = serializers.CharField(default='Bearer')
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'role', 'is_active']
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
-    """Current user profile serializer."""
     permissions = serializers.SerializerMethodField()
     role_display = serializers.CharField(source='get_role_display', read_only=True)
-    
+    avatar_url = serializers.SerializerMethodField()
+
     class Meta:
         model = User
         fields = [
             'id', 'username', 'email', 'first_name', 'last_name',
-            'role', 'role_display', 'is_active', 'permissions', 'created_at'
+            'role', 'role_display', 'is_active', 'permissions', 'avatar_url'
         ]
-    
+
     def get_permissions(self, obj):
         return {
             'can_manage_users': obj.can_manage_users,
@@ -83,3 +59,55 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'can_export_data': obj.can_export_data,
             'can_view_data': obj.can_view_data,
         }
+
+    def get_avatar_url(self, obj):
+        if obj.avatar:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.avatar.url)
+            return obj.avatar.url
+        return None
+
+
+class UpdateProfileSerializer(serializers.ModelSerializer):
+    """Update own profile: name, email, username."""
+
+    class Meta:
+        model = User
+        fields = ['username', 'email', 'first_name', 'last_name']
+
+    def validate_username(self, value):
+        user = self.instance
+        if User.objects.exclude(pk=user.pk).filter(username=value).exists():
+            raise serializers.ValidationError('Это имя уже занято')
+        return value
+
+    def validate_email(self, value):
+        user = self.instance
+        if User.objects.exclude(pk=user.pk).filter(email=value).exists():
+            raise serializers.ValidationError('Этот email уже используется')
+        return value
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    """Change own password."""
+    current_password = serializers.CharField(required=True, write_only=True)
+    new_password = serializers.CharField(required=True, write_only=True)
+    confirm_password = serializers.CharField(required=True, write_only=True)
+
+    def validate_current_password(self, value):
+        user = self.context['request'].user
+        if not user.check_password(value):
+            raise serializers.ValidationError('Неверный текущий пароль')
+        return value
+
+    def validate(self, data):
+        if data['new_password'] != data['confirm_password']:
+            raise serializers.ValidationError({'confirm_password': 'Пароли не совпадают'})
+        validate_password(data['new_password'])
+        return data
+
+
+class LoginSerializer(serializers.Serializer):
+    username = serializers.CharField(required=True)
+    password = serializers.CharField(required=True, write_only=True)

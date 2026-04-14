@@ -15,7 +15,7 @@ class UserRole(models.TextChoices):
 
 class User(AbstractUser):
     """
-    Custom User model with roles and Keycloak integration.
+    Custom User model with roles and token-based auth.
     """
     role = models.CharField(
         max_length=20,
@@ -28,11 +28,16 @@ class User(AbstractUser):
         blank=True,
         verbose_name='Keycloak ID'
     )
-    # Simple token for dev/demo auth
     auth_token = models.CharField(
         max_length=100,
         blank=True,
         verbose_name='Auth Token'
+    )
+    avatar = models.ImageField(
+        upload_to='avatars/',
+        null=True,
+        blank=True,
+        verbose_name='Аватарка'
     )
 
     class Meta:
@@ -67,12 +72,10 @@ class User(AbstractUser):
         return True
 
     def generate_token(self):
-        """Generate and save a new auth token."""
         self.auth_token = str(uuid.uuid4())
         self.save(update_fields=['auth_token'])
         return self.auth_token
 
     def revoke_token(self):
-        """Revoke the current auth token."""
         self.auth_token = ''
         self.save(update_fields=['auth_token'])
