@@ -1,0 +1,59 @@
+# ========== Python / Django ==========
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+venv/
+env/
+.venv/
+.env/
+
+# Django
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+/backend/staticfiles/
+/backend/media/
+/backend/logs/
+
+# Migrations — коммитим все миграции кроме __init__.py
+# (НЕ игнорируем — миграции должны быть в репо)
+
+# ========== Node / React / Vite ==========
+node_modules/
+
+# package-lock.json — генерируется под платформу и ломает Docker (arm64 vs x64)
+package-lock.json
+
+dist/
+.vite/
+*.local
+
+# ========== Environment files ==========
+.env
+.env.*
+!.env.example
+
+# ========== OS ==========
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ========== IDE ==========
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# ========== Docker ==========
+# docker-compose.override.yml — локальные оверрайды, если есть
+docker-compose.override.yml
