@@ -14,7 +14,7 @@ import type { RootState } from '../store'
 
 const { Title, Text } = Typography
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
+const API_URL = '/api'
 
 const ROLE_COLORS: Record<string, string> = {
   admin: 'red',
@@ -42,15 +42,11 @@ const ProfileDrawer = ({ open, onClose }: ProfileDrawerProps) => {
 
   const authHeaders = { Authorization: `Bearer ${token}` }
 
-  // ---- helpers ----
-
   const refreshUser = async () => {
     const res = await fetch(`${API_URL}/auth/users/me/`, { headers: authHeaders })
     const data = await res.json()
     dispatch(loginSuccess({ user: data, token: token! }))
   }
-
-  // ---- save profile ----
 
   const handleSaveProfile = async (values: Record<string, string>) => {
     setLoading(true)
@@ -74,8 +70,6 @@ const ProfileDrawer = ({ open, onClose }: ProfileDrawerProps) => {
     }
   }
 
-  // ---- change password ----
-
   const handleChangePassword = async (values: Record<string, string>) => {
     setLoading(true)
     try {
@@ -90,7 +84,6 @@ const ProfileDrawer = ({ open, onClose }: ProfileDrawerProps) => {
         message.error(Array.isArray(firstError) ? firstError[0] : String(firstError))
         return
       }
-      // Update token after password change
       dispatch(loginSuccess({ user: user, token: data.access_token }))
       message.success('Пароль изменён')
       pwdForm.resetFields()
@@ -99,8 +92,6 @@ const ProfileDrawer = ({ open, onClose }: ProfileDrawerProps) => {
       setLoading(false)
     }
   }
-
-  // ---- avatar upload ----
 
   const handleAvatarChange = async (file: File) => {
     const formData = new FormData()
@@ -135,7 +126,6 @@ const ProfileDrawer = ({ open, onClose }: ProfileDrawerProps) => {
       open={open}
       onClose={() => { setEditMode(false); setPwdMode(false); onClose() }}
     >
-      {/* Avatar block */}
       <div style={{ textAlign: 'center', marginBottom: 24 }}>
         <div style={{ position: 'relative', display: 'inline-block' }}>
           <Avatar
@@ -175,7 +165,6 @@ const ProfileDrawer = ({ open, onClose }: ProfileDrawerProps) => {
 
       <Divider />
 
-      {/* Profile info / edit */}
       {!editMode ? (
         <>
           <Space direction="vertical" style={{ width: '100%' }} size={8}>
@@ -212,11 +201,7 @@ const ProfileDrawer = ({ open, onClose }: ProfileDrawerProps) => {
           <Form.Item name="last_name" label="Фамилия">
             <Input />
           </Form.Item>
-          <Form.Item
-            name="username"
-            label="Логин"
-            rules={[{ required: true, message: 'Обязательное поле' }]}
-          >
+          <Form.Item name="username" label="Логин" rules={[{ required: true }]}>
             <Input />
           </Form.Item>
           <Form.Item name="email" label="Email">
@@ -235,45 +220,24 @@ const ProfileDrawer = ({ open, onClose }: ProfileDrawerProps) => {
 
       <Divider />
 
-      {/* Password change */}
       {!pwdMode ? (
-        <Button
-          icon={<LockOutlined />}
-          style={{ width: '100%' }}
-          onClick={() => setPwdMode(true)}
-        >
+        <Button icon={<LockOutlined />} style={{ width: '100%' }} onClick={() => setPwdMode(true)}>
           Изменить пароль
         </Button>
       ) : (
         <Form form={pwdForm} layout="vertical" onFinish={handleChangePassword}>
-          <Form.Item
-            name="current_password"
-            label="Текущий пароль"
-            rules={[{ required: true }]}
-          >
+          <Form.Item name="current_password" label="Текущий пароль" rules={[{ required: true }]}>
             <Input.Password prefix={<LockOutlined />} />
           </Form.Item>
-          <Form.Item
-            name="new_password"
-            label="Новый пароль"
-            rules={[{ required: true, min: 8, message: 'Минимум 8 символов' }]}
-          >
+          <Form.Item name="new_password" label="Новый пароль" rules={[{ required: true, min: 8 }]}>
             <Input.Password prefix={<LockOutlined />} />
           </Form.Item>
-          <Form.Item
-            name="confirm_password"
-            label="Подтвердите пароль"
-            rules={[{ required: true }]}
-          >
+          <Form.Item name="confirm_password" label="Подтвердите пароль" rules={[{ required: true }]}>
             <Input.Password prefix={<LockOutlined />} />
           </Form.Item>
           <Space>
-            <Button type="primary" htmlType="submit" loading={loading}>
-              Сохранить
-            </Button>
-            <Button onClick={() => { pwdForm.resetFields(); setPwdMode(false) }}>
-              Отмена
-            </Button>
+            <Button type="primary" htmlType="submit" loading={loading}>Сохранить</Button>
+            <Button onClick={() => { pwdForm.resetFields(); setPwdMode(false) }}>Отмена</Button>
           </Space>
         </Form>
       )}

@@ -7,7 +7,8 @@ import { loginStart, loginSuccess, loginFailure } from '../store/authSlice'
 
 const { Title } = Typography
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
+// Use relative URL so Vite proxy forwards to backend container
+const API_URL = '/api'
 
 const Login = () => {
   const navigate = useNavigate()

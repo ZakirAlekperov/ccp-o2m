@@ -19,7 +19,7 @@ import ProfileDrawer from '../../pages/Profile'
 
 const { Header, Sider, Content } = Layout
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
+const API_URL = '/api'
 
 const AppLayout = () => {
   const navigate = useNavigate()
