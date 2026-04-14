@@ -1,19 +1,18 @@
-# users/authentication.py
 from rest_framework.authentication import BaseAuthentication
 from rest_framework.exceptions import AuthenticationFailed
-from django.contrib.auth import get_user_model
-
-User = get_user_model()
 
 
 class TokenAuthentication(BaseAuthentication):
     """
     Simple token-based authentication.
-    Token is stored in User.auth_token field (UUID string).
-    Client sends: Authorization: Bearer <token>
+    Reads Authorization: Bearer <token>, looks up User by auth_token field.
+    get_user_model() is called lazily inside the method to avoid AppRegistryNotReady.
     """
 
     def authenticate(self, request):
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+
         auth_header = request.META.get('HTTP_AUTHORIZATION', '')
         if not auth_header.startswith('Bearer '):
             return None
@@ -30,5 +29,5 @@ class TokenAuthentication(BaseAuthentication):
         return (user, token)
 
 
-# Keep old name as alias so settings.py import doesn't break
+# Alias for backwards compatibility with settings.py
 KeycloakAuthentication = TokenAuthentication
