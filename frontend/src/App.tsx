@@ -1,5 +1,6 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
-import { Layout } from 'antd'
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { useSelector } from 'react-redux'
+import type { RootState } from './store'
 import AppLayout from './components/Layout/AppLayout'
 import Dashboard from './pages/Dashboard'
 import ImagingRequests from './pages/ImagingRequests'
@@ -13,14 +14,25 @@ import FlightTasks from './pages/FlightTasks'
 import Login from './pages/Login'
 import './App.css'
 
-const { Content } = Layout
+// Защищённый роут — редиректит на /login если нет токена
+const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
+  const { token } = useSelector((state: RootState) => state.auth)
+  return token ? <>{children}</> : <Navigate to="/login" replace />
+}
 
 function App() {
   return (
     <Router>
       <Routes>
         <Route path="/login" element={<Login />} />
-        <Route path="/" element={<AppLayout />}>
+        <Route
+          path="/"
+          element={
+            <PrivateRoute>
+              <AppLayout />
+            </PrivateRoute>
+          }
+        >
           <Route index element={<Dashboard />} />
           <Route path="requests" element={<ImagingRequests />} />
           <Route path="requests/new" element={<ImagingRequestEdit />} />
@@ -32,6 +44,8 @@ function App() {
           <Route path="planning" element={<Planning />} />
           <Route path="flight-tasks" element={<FlightTasks />} />
         </Route>
+        {/* Fallback */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
   )

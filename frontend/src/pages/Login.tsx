@@ -1,16 +1,54 @@
-import { Form, Input, Button, Card, Typography } from 'antd'
+import { useState } from 'react'
+import { Form, Input, Button, Card, Typography, Alert } from 'antd'
 import { UserOutlined, LockOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
+import { useDispatch } from 'react-redux'
+import { loginStart, loginSuccess, loginFailure } from '../store/authSlice'
 
 const { Title } = Typography
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
+
 const Login = () => {
   const navigate = useNavigate()
+  const dispatch = useDispatch()
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
 
-  const onFinish = (values: { username: string; password: string }) => {
-    console.log('Login:', values)
-    // TODO: Implement actual login
-    navigate('/')
+  const onFinish = async (values: { username: string; password: string }) => {
+    setError(null)
+    setLoading(true)
+    dispatch(loginStart())
+
+    try {
+      const response = await fetch(`${API_URL}/auth/users/login/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(values),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        const msg = data.error || 'Ошибка входа'
+        dispatch(loginFailure(msg))
+        setError(msg)
+        return
+      }
+
+      dispatch(loginSuccess({
+        user: data.user,
+        token: data.access_token,
+      }))
+
+      navigate('/')
+    } catch (e) {
+      const msg = 'Не удалось подключиться к серверу'
+      dispatch(loginFailure(msg))
+      setError(msg)
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -26,11 +64,17 @@ const Login = () => {
           <Title level={3}>КЦП О-2М</Title>
           <p>Комплекс целевого планирования</p>
         </div>
-        <Form
-          name="login"
-          onFinish={onFinish}
-          autoComplete="off"
-        >
+
+        {error && (
+          <Alert
+            message={error}
+            type="error"
+            showIcon
+            style={{ marginBottom: 16 }}
+          />
+        )}
+
+        <Form name="login" onFinish={onFinish} autoComplete="off">
           <Form.Item
             name="username"
             rules={[{ required: true, message: 'Введите имя пользователя' }]}
@@ -46,7 +90,7 @@ const Login = () => {
           </Form.Item>
 
           <Form.Item>
-            <Button type="primary" htmlType="submit" block>
+            <Button type="primary" htmlType="submit" block loading={loading}>
               Войти
             </Button>
           </Form.Item>

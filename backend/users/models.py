@@ -1,85 +1,78 @@
 """
 Users models for CCP O2M.
 """
+import uuid
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 
 
 class UserRole(models.TextChoices):
-    """User roles according to ТЗ."""
     ADMIN = 'admin', 'Администратор'
-    SUPERUSER = 'superuser', 'Суперпользователь'
-    PLANNER = 'planner', 'Планировщик'
-    EXTERNAL_OPERATOR = 'external_operator', 'Внешний оператор'
+    OPERATOR = 'operator', 'Оператор'
+    ANALYST = 'analyst', 'Аналитик'
+    VIEWER = 'viewer', 'Наблюдатель'
 
 
 class User(AbstractUser):
     """
-    Custom User model with Keycloak integration support.
+    Custom User model with roles and Keycloak integration.
     """
-    email = models.EmailField(unique=True, verbose_name='Email')
     role = models.CharField(
         max_length=20,
         choices=UserRole.choices,
-        default=UserRole.EXTERNAL_OPERATOR,
+        default=UserRole.VIEWER,
         verbose_name='Роль'
     )
     keycloak_id = models.CharField(
-        max_length=36,
+        max_length=100,
         blank=True,
-        null=True,
-        unique=True,
         verbose_name='Keycloak ID'
     )
-    is_active = models.BooleanField(default=True, verbose_name='Активен')
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Создан')
-    updated_at = models.DateTimeField(auto_now=True, verbose_name='Обновлён')
+    # Simple token for dev/demo auth
+    auth_token = models.CharField(
+        max_length=100,
+        blank=True,
+        verbose_name='Auth Token'
+    )
 
     class Meta:
         verbose_name = 'Пользователь'
         verbose_name_plural = 'Пользователи'
-        ordering = ['-created_at']
 
     def __str__(self):
         return f"{self.username} ({self.get_role_display()})"
 
-    def has_role(self, roles):
-        """Check if user has any of the specified roles."""
-        if isinstance(roles, str):
-            roles = [roles]
-        return self.role in roles
-
     @property
     def can_manage_users(self):
-        """Only admin can manage users."""
-        return self.role == UserRole.ADMIN
+        return self.role == UserRole.ADMIN or self.is_superuser
 
     @property
     def can_manage_satellites(self):
-        """Admin and superuser can manage satellites."""
-        return self.role in [UserRole.ADMIN, UserRole.SUPERUSER]
+        return self.role in [UserRole.ADMIN, UserRole.OPERATOR] or self.is_superuser
 
     @property
     def can_create_requests(self):
-        """Admin, superuser and planner can create imaging requests."""
-        return self.role in [UserRole.ADMIN, UserRole.SUPERUSER, UserRole.PLANNER]
+        return self.role in [UserRole.ADMIN, UserRole.OPERATOR, UserRole.ANALYST] or self.is_superuser
 
     @property
     def can_plan(self):
-        """Admin, superuser and planner can plan."""
-        return self.role in [UserRole.ADMIN, UserRole.SUPERUSER, UserRole.PLANNER]
+        return self.role in [UserRole.ADMIN, UserRole.OPERATOR] or self.is_superuser
 
     @property
     def can_export_data(self):
-        """All authenticated users except guests can export."""
-        return self.role in [
-            UserRole.ADMIN,
-            UserRole.SUPERUSER,
-            UserRole.PLANNER,
-            UserRole.EXTERNAL_OPERATOR
-        ]
+        return self.role in [UserRole.ADMIN, UserRole.ANALYST] or self.is_superuser
 
     @property
     def can_view_data(self):
-        """All authenticated users can view data."""
         return True
+
+    def generate_token(self):
+        """Generate and save a new auth token."""
+        self.auth_token = str(uuid.uuid4())
+        self.save(update_fields=['auth_token'])
+        return self.auth_token
+
+    def revoke_token(self):
+        """Revoke the current auth token."""
+        self.auth_token = ''
+        self.save(update_fields=['auth_token'])
