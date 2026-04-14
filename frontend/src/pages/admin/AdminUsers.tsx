@@ -1,15 +1,25 @@
 import { useEffect, useState } from 'react'
 import {
   Table, Tag, Button, Space, Modal, Form, Input, Select,
-  Typography, Spin, Alert, Popconfirm, message,
+  Typography, Spin, Alert, Popconfirm, message, Badge, Avatar,
 } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
+import { PlusOutlined, EditOutlined, DeleteOutlined, UserOutlined } from '@ant-design/icons'
 import { useSelector } from 'react-redux'
 import type { RootState } from '../../store'
 import type { ColumnsType } from 'antd/es/table'
 
-const { Title } = Typography
+const { Title, Text } = Typography
 const API_URL = '/api'
+
+const ROLE_OPTIONS = [
+  { value: 'admin',    label: 'Администратор' },
+  { value: 'operator', label: 'Оператор' },
+  { value: 'analyst',  label: 'Аналитик' },
+  { value: 'viewer',   label: 'Наблюдатель' },
+]
+const ROLE_COLOR: Record<string, string> = {
+  admin: 'red', operator: 'blue', analyst: 'purple', viewer: 'default',
+}
 
 interface UserRecord {
   id: number
@@ -20,18 +30,14 @@ interface UserRecord {
   role: string
   role_display: string
   is_active: boolean
-}
-
-interface Group {
-  id: number
-  name: string
+  avatar_url?: string
 }
 
 const AdminUsers = () => {
   const { token } = useSelector((state: RootState) => state.auth)
   const [users, setUsers] = useState<UserRecord[]>([])
-  const [groups, setGroups] = useState<Group[]>([])
   const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<UserRecord | null>(null)
@@ -39,18 +45,13 @@ const AdminUsers = () => {
 
   const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
 
-  const fetchAll = async () => {
+  const fetchUsers = async () => {
     try {
       setLoading(true)
-      const [uRes, gRes] = await Promise.all([
-        fetch(`${API_URL}/auth/users/`, { headers }),
-        fetch(`${API_URL}/auth/groups/`, { headers }),
-      ])
-      if (!uRes.ok) throw new Error('Ошибка загрузки пользователей')
-      const uData = await uRes.json()
-      const gData = gRes.ok ? await gRes.json() : []
-      setUsers(Array.isArray(uData) ? uData : uData.results ?? [])
-      setGroups(Array.isArray(gData) ? gData : gData.results ?? [])
+      const res = await fetch(`${API_URL}/auth/users/`, { headers })
+      if (!res.ok) throw new Error('Ошибка загрузки пользователей')
+      const data = await res.json()
+      setUsers(Array.isArray(data) ? data : data.results ?? [])
     } catch (e: any) {
       setError(e.message)
     } finally {
@@ -58,11 +59,12 @@ const AdminUsers = () => {
     }
   }
 
-  useEffect(() => { fetchAll() }, [])
+  useEffect(() => { fetchUsers() }, [])
 
   const openCreate = () => {
     setEditingUser(null)
     form.resetFields()
+    form.setFieldsValue({ is_active: true, role: 'operator' })
     setModalOpen(true)
   }
 
@@ -75,17 +77,21 @@ const AdminUsers = () => {
   const handleSave = async () => {
     try {
       const values = await form.validateFields()
-      const url = editingUser
-        ? `${API_URL}/auth/users/${editingUser.id}/`
-        : `${API_URL}/auth/users/`
+      setSaving(true)
+      const url    = editingUser ? `${API_URL}/auth/users/${editingUser.id}/` : `${API_URL}/auth/users/`
       const method = editingUser ? 'PATCH' : 'POST'
       const res = await fetch(url, { method, headers, body: JSON.stringify(values) })
-      if (!res.ok) throw new Error('Ошибка сохранения')
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(Object.values(err).flat().join('; '))
+      }
       message.success(editingUser ? 'Пользователь обновлён' : 'Пользователь создан')
       setModalOpen(false)
-      fetchAll()
+      fetchUsers()
     } catch (e: any) {
       message.error(e.message)
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -94,95 +100,128 @@ const AdminUsers = () => {
       const res = await fetch(`${API_URL}/auth/users/${id}/`, { method: 'DELETE', headers })
       if (!res.ok) throw new Error('Ошибка удаления')
       message.success('Пользователь удалён')
-      fetchAll()
+      fetchUsers()
     } catch (e: any) {
       message.error(e.message)
     }
   }
 
   const columns: ColumnsType<UserRecord> = [
-    { title: 'ID', dataIndex: 'id', width: 60 },
-    { title: 'Логин', dataIndex: 'username' },
-    { title: 'Email', dataIndex: 'email' },
     {
-      title: 'Имя',
-      render: (_, r) => `${r.first_name} ${r.last_name}`.trim() || '—',
+      title: 'Пользователь',
+      render: (_, r) => (
+        <Space>
+          <Avatar src={r.avatar_url} icon={<UserOutlined />} size={32} />
+          <div>
+            <div><Text strong>{r.username}</Text></div>
+            <div><Text type="secondary" style={{ fontSize: 12 }}>{r.email || '—'}</Text></div>
+          </div>
+        </Space>
+      ),
     },
     {
-      title: 'Группа / Роль',
-      dataIndex: 'role_display',
-      render: (val) => <Tag color="blue">{val}</Tag>,
+      title: 'Полное имя',
+      render: (_, r) => {
+        const name = `${r.first_name} ${r.last_name}`.trim()
+        return name || <Text type="secondary">—</Text>
+      },
+    },
+    {
+      title: 'Роль',
+      dataIndex: 'role',
+      filters: ROLE_OPTIONS.map(o => ({ text: o.label, value: o.value })),
+      onFilter: (value, record) => record.role === value,
+      render: (v, r) => <Tag color={ROLE_COLOR[v] ?? 'default'}>{r.role_display || v}</Tag>,
     },
     {
       title: 'Статус',
       dataIndex: 'is_active',
-      render: (v) => v ? <Tag color="green">Активен</Tag> : <Tag color="red">Неактивен</Tag>,
+      filters: [{ text: 'Активен', value: true }, { text: 'Неактивен', value: false }],
+      onFilter: (value, record) => record.is_active === value,
+      render: (v) => v
+        ? <Badge status="success" text="Активен" />
+        : <Badge status="error"   text="Неактивен" />,
     },
     {
-      title: 'Действия',
+      title: '',
+      width: 160,
       render: (_, record) => (
         <Space>
-          <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(record)}>Изменить</Button>
-          <Popconfirm title="Удалить пользователя?" onConfirm={() => handleDelete(record.id)}>
-            <Button size="small" danger icon={<DeleteOutlined />}>Удалить</Button>
+          <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(record)}>
+            Изменить
+          </Button>
+          <Popconfirm
+            title="Удалить пользователя?"
+            description="Действие необратимо."
+            okText="Удалить"
+            okButtonProps={{ danger: true }}
+            cancelText="Отмена"
+            onConfirm={() => handleDelete(record.id)}
+          >
+            <Button size="small" danger icon={<DeleteOutlined />} />
           </Popconfirm>
         </Space>
       ),
     },
   ]
 
-  if (loading) return <Spin size="large" style={{ display: 'block', marginTop: 80, textAlign: 'center' }} />
-  if (error) return <Alert type="error" message={error} style={{ margin: 24 }} />
+  if (loading) return <Spin size="large" style={{ display: 'block', margin: '80px auto' }} />
+  if (error)   return <Alert type="error" message={error} style={{ margin: 24 }} />
 
   return (
     <div style={{ padding: 24 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <Title level={3} style={{ margin: 0 }}>Пользователи</Title>
-        <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>Добавить</Button>
+        <Title level={4} style={{ margin: 0 }}>Пользователи</Title>
+        <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+          Добавить пользователя
+        </Button>
       </div>
 
-      <Table rowKey="id" columns={columns} dataSource={users} />
+      <Table
+        rowKey="id"
+        columns={columns}
+        dataSource={users}
+        size="middle"
+        pagination={{ pageSize: 20, showTotal: (t) => `Всего: ${t}` }}
+      />
 
       <Modal
         title={editingUser ? 'Редактировать пользователя' : 'Новый пользователь'}
         open={modalOpen}
         onOk={handleSave}
+        confirmLoading={saving}
         onCancel={() => setModalOpen(false)}
         okText="Сохранить"
         cancelText="Отмена"
+        width={520}
+        destroyOnClose
       >
-        <Form form={form} layout="vertical">
-          <Form.Item name="username" label="Логин" rules={[{ required: true }]}>
-            <Input />
+        <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
+          <Form.Item name="username" label="Логин" rules={[{ required: true, message: 'Введите логин' }]}>
+            <Input autoComplete="off" />
           </Form.Item>
           {!editingUser && (
-            <Form.Item name="password" label="Пароль" rules={[{ required: true }]}>
-              <Input.Password />
+            <Form.Item name="password" label="Пароль" rules={[{ required: true, message: 'Введите пароль' }]}>
+              <Input.Password autoComplete="new-password" />
             </Form.Item>
           )}
-          <Form.Item name="email" label="Email" rules={[{ type: 'email' }]}>
+          <Form.Item name="email" label="Email" rules={[{ type: 'email', message: 'Некорректный email' }]}>
             <Input />
           </Form.Item>
-          <Form.Item name="first_name" label="Имя">
-            <Input />
+          <Space style={{ width: '100%' }} size={12}>
+            <Form.Item name="first_name" label="Имя" style={{ flex: 1, marginBottom: 0 }}>
+              <Input />
+            </Form.Item>
+            <Form.Item name="last_name" label="Фамилия" style={{ flex: 1, marginBottom: 0 }}>
+              <Input />
+            </Form.Item>
+          </Space>
+          <Form.Item name="role" label="Роль" style={{ marginTop: 16 }} rules={[{ required: true }]}>
+            <Select options={ROLE_OPTIONS} />
           </Form.Item>
-          <Form.Item name="last_name" label="Фамилия">
-            <Input />
-          </Form.Item>
-          <Form.Item name="role" label="Группа / Роль">
-            <Select
-              options={[
-                { value: 'operator', label: 'Оператор' },
-                { value: 'admin', label: 'Администратор' },
-                ...groups
-                  .filter(g => g.name !== 'operator' && g.name !== 'admin')
-                  .map(g => ({ value: g.name, label: g.name })),
-              ]}
-            />
-          </Form.Item>
-          <Form.Item name="is_active" label="Статус" initialValue={true}>
+          <Form.Item name="is_active" label="Статус">
             <Select options={[
-              { value: true, label: 'Активен' },
+              { value: true,  label: 'Активен' },
               { value: false, label: 'Неактивен' },
             ]} />
           </Form.Item>
