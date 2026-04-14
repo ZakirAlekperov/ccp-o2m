@@ -2,8 +2,10 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Install dependencies
-COPY package*.json ./
+# Copy only package.json (NOT package-lock.json) to avoid cross-platform issues
+COPY package.json ./
+
+# Clean install without lock file to resolve correct platform binaries
 RUN npm install
 
 # Copy source
